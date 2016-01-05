@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:amq="http://activemq.apache.org/schema/core" xmlns:jms="http://www.springframework.org/schema/jms"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:gfe="http://www.springframework.org/schema/gemfire"
+	xmlns:gfe-data="http://www.springframework.org/schema/data/gemfire"
+	xmlns:util="http://www.springframework.org/schema/util"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+http://activemq.apache.org/schema/core http://activemq.apache.org/schema/core/activemq-core-5.11.1.xsd
+http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd
+http://www.springframework.org/schema/jms http://www.springframework.org/schema/jms/spring-jms-4.2.xsd
+http://www.springframework.org/schema/data/gemfire
+	http://www.springframework.org/schema/data/gemfire/spring-data-gemfire.xsd
+	http://www.springframework.org/schema/util
+	http://www.springframework.org/schema/util/spring-util.xsd
+	http://www.springframework.org/schema/gemfire
+	http://www.springframework.org/schema/gemfire/spring-gemfire.xsd
+	http://www.springframework.org/schema/data/repository
+    http://www.springframework.org/schema/data/repository/spring-repository.xsd">
+
+
+	<context:annotation-config />
+
+	<context:component-scan base-package="io.pivotal" />
+
+
+	<!-- allows for ${} replacement in the spring xml configuration from the
+		system.properties file on the classpath -->
+	<context:property-placeholder location="classpath:system.properties" />
+
+
+	<!-- creates an activemq connection factory using the amq namespace -->
+	<amq:connectionFactory id="amqConnectionFactory"
+		brokerURL="${jms.url}" userName="${jms.username}" password="${jms.password}" />
+
+
+	<!-- CachingConnectionFactory Definition, sessionCacheSize property is the
+		number of sessions to cache -->
+	<bean id="connectionFactory"
+		class="org.springframework.jms.connection.CachingConnectionFactory">
+		<constructor-arg ref="amqConnectionFactory" />
+		<property name="exceptionListener" ref="jmsExceptionListener" />
+		<property name="sessionCacheSize" value="100" />
+	</bean>
+
+
+	<!-- JmsTemplate Definition -->
+	<bean id="jmsTemplate" class="org.springframework.jms.core.JmsTemplate">
+		<constructor-arg ref="connectionFactory" />
+	</bean>
+
+</beans>

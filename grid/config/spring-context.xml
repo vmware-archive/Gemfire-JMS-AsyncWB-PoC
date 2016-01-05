@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:amq="http://activemq.apache.org/schema/core" xmlns:jms="http://www.springframework.org/schema/jms"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:gfe="http://www.springframework.org/schema/gemfire"
+	xmlns:gfe-data="http://www.springframework.org/schema/data/gemfire"
+	xmlns:util="http://www.springframework.org/schema/util"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+http://activemq.apache.org/schema/core http://activemq.apache.org/schema/core/activemq-core-5.11.1.xsd
+http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd
+http://www.springframework.org/schema/jms http://www.springframework.org/schema/jms/spring-jms-4.2.xsd
+http://www.springframework.org/schema/data/gemfire
+	http://www.springframework.org/schema/data/gemfire/spring-data-gemfire.xsd
+	http://www.springframework.org/schema/util
+	http://www.springframework.org/schema/util/spring-util.xsd
+	http://www.springframework.org/schema/gemfire
+	http://www.springframework.org/schema/gemfire/spring-gemfire.xsd
+	http://www.springframework.org/schema/data/repository
+    http://www.springframework.org/schema/data/repository/spring-repository.xsd">
+
+
+	<context:annotation-config />
+
+	<context:component-scan base-package="io.pivotal" />
+
+	<util:properties id="CacheConfigurationSettings">
+		<prop key="name">springGemFireCache</prop>
+		<prop key="locators">localhost[10334]</prop>
+		<prop key="log-level">config</prop>
+		<prop key="mcast-port">0</prop>
+	</util:properties>
+
+	<!-- allows for ${} replacement in the spring xml configuration from the
+		system.properties file on the classpath -->
+	<context:property-placeholder location="classpath:system.properties" />
+
+
+	<!-- creates an activemq connection factory using the amq namespace -->
+	<amq:connectionFactory id="amqConnectionFactory"
+		brokerURL="${jms.url}" userName="${jms.username}" password="${jms.password}" />
+
+
+	<!-- CachingConnectionFactory Definition, sessionCacheSize property is the
+		number of sessions to cache -->
+	<bean id="connectionFactory"
+		class="org.springframework.jms.connection.CachingConnectionFactory">
+		<constructor-arg ref="amqConnectionFactory" />
+		<property name="exceptionListener" ref="jmsExceptionListener" />
+		<property name="sessionCacheSize" value="100" />
+	</bean>
+
+
+	<!-- JmsTemplate Definition -->
+	<bean id="jmsTemplate" class="org.springframework.jms.core.JmsTemplate">
+		<constructor-arg ref="connectionFactory" />
+	</bean>
+
+
+<!--  listener container definition using the jms namespace, concurrency
+		is the max number of concurrent listeners that can be started
+	<jms:listener-container concurrency="10">
+		<jms:listener id="QueueListener" destination="Queue.Name"
+			ref="queueListener" />
+	</jms:listener-container> -->
+
+	<!-- this is the Message Driven POJO (MDP) -->
+	<bean id="messageListener" class="io.pivotal.jms.core.TradeMessageListener" />
+
+	<bean id="destination" class="org.apache.activemq.command.ActiveMQQueue">
+		<constructor-arg value="test.queue1"/>
+	</bean>
+
+	<!-- and this is the message listener container -->
+	<bean id="jmsContainer"
+		class="org.springframework.jms.listener.DefaultMessageListenerContainer">
+		<property name="connectionFactory" ref="connectionFactory" />
+		<property name="destination" ref="destination"/>
+		<property name="messageListener" ref="messageListener" />
+		<property name="sessionTransacted" value="true"/>
+	</bean>
+
+	<!-- Database connection -->
+
+	<bean id="dataSource"
+		class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+
+		<property name="driverClassName" value="com.mysql.jdbc.Driver" />
+		<property name="url" value="jdbc:mysql://localhost:3306/gemfiretest" />
+		<property name="username" value="admin" />
+		<property name="password" value="admin" />
+	</bean>
+
+	<bean id="jdbcTemplate" class="org.springframework.jdbc.core.JdbcTemplate">
+		<property name="dataSource" ref="dataSource"/>
+	</bean>
+
+	<!-- Gemfire Properties -->
+	<gfe:cache properties-ref="CacheConfigurationSettings" pdx-read-serialized="true" />
+	<gfe:cache-server auto-startup="true" cache-ref="gemfireCache" />
+
+	<gfe:async-event-queue id="writeBackQueue" persistent="false" parallel="false" dispatcher-threads="4">
+	  <gfe:async-event-listener>
+	    <bean class="io.pivotal.gemfire.core.WriteBackAsyncEventListener"/>
+	  </gfe:async-event-listener>
+	</gfe:async-event-queue>
+
+	<gfe:partitioned-region id="trade" persistent="false">
+		<gfe:async-event-queue-ref bean="writeBackQueue"/>
+	</gfe:partitioned-region>
+
+</beans>
