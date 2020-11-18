@@ -1,4 +1,4 @@
-#Integration of JMS and Gemfire async Write-behind
+<h1> VMware has ended active development of this project, this repository will no longer be updated.</h1><br>#Integration of JMS and Gemfire async Write-behind
 
 This project provides a sample implementation of async write-behind after reading a message from JMS. Demo makes use of Apache activemq, mysql and Gemfire. Before we good run this project, we need to have activemq and mysql running on the local sandbox.
 
